@@ -1,0 +1,92 @@
+import { createConversation } from "./conversation.js";
+
+export const demoConversation = createConversation({
+  provider: "chatgpt",
+  id: "demo-7a2f19c4",
+  title: "设计一个可靠的任务队列",
+  sourceUrl: "https://chatgpt.com/c/demo-7a2f19c4",
+  createdAt: 1784595600,
+  updatedAt: 1784596800,
+  extractionMethod: "api",
+  scanComplete: true,
+  messages: [
+    {
+      id: "demo-1",
+      role: "user",
+      markdown: "我需要一个支持重试和幂等的任务队列，先帮我梳理设计。",
+      createdAt: 1784595600,
+      status: "finished_successfully",
+      sources: [],
+    },
+    {
+      id: "demo-2",
+      role: "assistant",
+      markdown: "可以从三个约束开始：\n\n1. **至少一次投递**\n2. 业务处理必须幂等\n3. 失败任务进入延迟重试队列\n\n核心状态可以表示为 `pending -> running -> completed`。",
+      createdAt: 1784595660,
+      status: "finished_successfully",
+      sources: [],
+    },
+    {
+      id: "demo-3",
+      role: "user",
+      markdown: "给一个 TypeScript 的幂等键示例。",
+      createdAt: 1784595900,
+      status: "finished_successfully",
+      sources: [],
+    },
+    {
+      id: "demo-4",
+      role: "assistant",
+      markdown: "```ts\nconst key = `${job.type}:${job.resourceId}:${job.version}`;\nawait dedupe.claim(key, { ttl: 3600 });\n```\n\n重试退避可以使用 $d_n = \\min(2^n, 300)$ 秒。",
+      createdAt: 1784595960,
+      status: "finished_successfully",
+      sources: [{ title: "Obsidian Markdown guide", url: "https://help.obsidian.md/syntax" }],
+    },
+    {
+      id: "demo-5",
+      role: "user",
+      markdown: "怎样监控积压？",
+      createdAt: 1784596200,
+      status: "finished_successfully",
+      sources: [],
+    },
+    {
+      id: "demo-6",
+      role: "assistant",
+      markdown: "至少记录队列深度、最老任务年龄、成功率和重试次数。告警优先看最老任务年龄，它比单纯的队列长度更能反映用户等待时间。",
+      createdAt: 1784596260,
+      status: "finished_successfully",
+      sources: [],
+    },
+    {
+      id: "demo-7",
+      role: "user",
+      markdown: "最后总结一下上线顺序。",
+      createdAt: 1784596740,
+      status: "finished_successfully",
+      sources: [],
+    },
+    {
+      id: "demo-8",
+      role: "assistant",
+      markdown: "先上线单消费者和幂等保护，再加入重试与死信队列，最后根据真实流量扩展并发。每一步都保留可回滚开关。",
+      createdAt: 1784596800,
+      status: "finished_successfully",
+      sources: [],
+    },
+  ],
+});
+
+export const demoGeminiConversation = createConversation({
+  provider: "gemini",
+  id: "gemini-demo-a91c42ef",
+  title: "把研究资料整理成可执行方案",
+  sourceUrl: "https://gemini.google.com/app/gemini-demo-a91c42ef",
+  extractionMethod: "dom",
+  scanComplete: true,
+  messages: demoConversation.messages.map((message, index) => ({
+    ...message,
+    id: `gemini-demo-${index + 1}`,
+    sources: message.sources.map((source) => ({ ...source })),
+  })),
+});

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pending export fixture</title>
+    <style>
+      body { margin: 32px; font: 16px system-ui, sans-serif; }
+      #result { font-weight: 700; }
+      .pass { color: #16833c; }
+      .fail { color: #b42318; }
+    </style>
+  </head>
+  <body>
+    <p id="result">RUNNING</p>
+    <script type="module">
+      import {
+        claimPendingExport,
+        clearPendingExport,
+        finalizePendingExport,
+        getConversationFilename,
+        getPendingExport,
+        recordPendingExportFilename,
+        setPendingExport,
+      } from "../src/file-store.js";
+      import { createPendingExport } from "../src/export-flow.js";
+
+      const result = document.getElementById("result");
+      const requestA = "fixture-request-a";
+      const requestB = "fixture-request-b";
+      const expiredRequest = "fixture-request-expired";
+      try {
+        const pendingA = createPendingExport({
+          requestId: requestA,
+          conversationId: "fixture-conversation-a",
+          filename: "Fixture A.md",
+          markdown: "---\nconversation_id: \"fixture-conversation-a\"\n---\n",
+          sourceTabId: 11,
+        });
+        const pendingB = createPendingExport({
+          requestId: requestB,
+          conversationId: "fixture-conversation-b",
+          filename: "Fixture B.md",
+          markdown: "---\nconversation_id: \"fixture-conversation-b\"\n---\n",
+          sourceTabId: 12,
+        });
+        const expiredPending = {
+          ...createPendingExport({
+            requestId: expiredRequest,
+            conversationId: "fixture-conversation-expired",
+            filename: "Expired.md",
+            markdown: "# Expired",
+          }),
+          createdAt: new Date(Date.now() - 31 * 60 * 1000).toISOString(),
+        };
+
+        await setPendingExport(expiredPending);
+        await setPendingExport(pendingA);
+        await setPendingExport(pendingB);
+        const loadedA = await getPendingExport(requestA);
+        const loadedB = await getPendingExport(requestB);
+        const claimedA = await claimPendingExport(requestA, "fixture-owner-a");
+        const competingClaim = await claimPendingExport(requestA, "fixture-owner-b");
+        await recordPendingExportFilename(requestA, "fixture-owner-a", "Fixture A (2).md");
+        const completedA = await finalizePendingExport(
+          requestA,
+          "fixture-owner-a",
+          "Fixture A (2).md",
+        );
+        const rememberedFilename = await getConversationFilename("fixture-conversation-a");
+        const untouchedB = await getPendingExport(requestB);
+        const cleanedExpired = await getPendingExport(expiredRequest);
+
+        const passed = loadedA.id === requestA
+          && loadedB.id === requestB
+          && claimedA.ownerId === "fixture-owner-a"
+          && competingClaim.ownerId === "fixture-owner-a"
+          && completedA.status === "completed"
+          && !("markdown" in completedA)
+          && rememberedFilename === "Fixture A (2).md"
+          && untouchedB.id === requestB
+          && untouchedB.status === "pending"
+          && cleanedExpired.status === "expired"
+          && !("markdown" in cleanedExpired);
+
+        await clearPendingExport(requestA);
+        await clearPendingExport(requestB);
+        await clearPendingExport(expiredRequest);
+        if (!passed) throw new Error("Pending export state did not match expectations.");
+        result.textContent = "PASS";
+        result.className = "pass";
+      } catch (error) {
+        result.textContent = `FAIL: ${error.message}`;
+        result.className = "fail";
+      }
+    </script>
+  </body>
+</html>

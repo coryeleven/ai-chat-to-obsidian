@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <title>Gemini DOM 提取测试 - Gemini</title>
+    <style>
+      body { margin: 32px; font: 15px/1.5 system-ui, sans-serif; }
+      infinite-scroller, .conversation-container, user-query, model-response,
+      message-content, sources-list { display: block; }
+      .conversation-container { margin: 18px 0; }
+      #result { padding: 12px; border: 1px solid #aaa; }
+    </style>
+  </head>
+  <body>
+    <h1>Gemini DOM fixture</h1>
+    <infinite-scroller data-test-id="chat-history-container">
+      <div class="conversation-container" data-turn-id="g-turn-1">
+        <user-query data-message-id="g-u-1">
+          <span class="cdk-visually-hidden">你说：</span>
+          <div class="query-text"><p class="query-text-line">请给我一个 TypeScript 示例。</p></div>
+        </user-query>
+        <model-response data-message-id="g-a-1">
+          <div class="response-content">
+            <response-container>
+              <structured-content-container>
+                <div class="container">
+                  <message-content class="model-response-text">
+                    <div class="markdown markdown-main-panel">
+                      <p>这是一个 <strong>TypeScript</strong> 示例。</p>
+                      <code-block>
+                        <div class="code-block-decoration"><span>typescript</span><button>复制代码</button></div>
+                        <pre><code class="language-ts">const ready = true;
+console.log(ready);</code></pre>
+                      </code-block>
+                      <code-block data-language="js">
+                        <div class="code-block-decoration"><span>javascript</span><button>复制代码</button></div>
+                        <div class="cm-editor">
+                          <div class="cm-content">
+                            <div class="cm-line">const first = 1;</div>
+                            <div class="cm-line">const second = 2;</div>
+                          </div>
+                        </div>
+                      </code-block>
+                      <table>
+                        <thead><tr><th>状态</th><th>值</th></tr></thead>
+                        <tbody><tr><td>ready</td><td>true</td></tr></tbody>
+                      </table>
+                      <p>质能关系是 <span class="katex"><annotation encoding="application/x-tex">E = mc^2</annotation></span>。</p>
+                      <p><a href="https://ai.google.dev/gemini-api/docs">Gemini API</a></p>
+                      <p><a href="javascript:alert(1)">危险链接</a></p>
+                    </div>
+                  </message-content>
+                </div>
+              </structured-content-container>
+            </response-container>
+            <sources-list>
+              <a href="https://ai.google.dev/gemini-api/docs">Gemini API 文档</a>
+            </sources-list>
+            <message-actions><button>赞</button></message-actions>
+          </div>
+        </model-response>
+      </div>
+      <div class="conversation-container" data-turn-id="g-turn-2">
+        <user-query data-message-id="g-u-2">
+          <div class="query-text">
+            <p class="query-text-line">再给一个表格结论。</p>
+            <p class="query-text-line">保持简洁。</p>
+          </div>
+        </user-query>
+        <model-response data-message-id="g-a-2">
+          <div class="response-content">
+            <message-content class="model-response-text">
+              <div class="markdown markdown-main-panel">
+                <blockquote><p>先验证，再发布。</p></blockquote>
+              </div>
+            </message-content>
+            <message-actions><button aria-label="复制回答">复制回答</button></message-actions>
+          </div>
+        </model-response>
+      </div>
+      <div class="conversation-container">
+        <user-query><div class="query-text"><p>重复问题</p></div></user-query>
+        <model-response><message-content><p>重复回答</p></message-content></model-response>
+      </div>
+      <div class="conversation-container">
+        <user-query><div class="query-text"><p>重复问题</p></div></user-query>
+        <model-response><message-content><p>重复回答</p></message-content></model-response>
+      </div>
+      <div class="conversation-container">
+        <div data-message-author-role="user"><p>旧版用户节点</p></div>
+        <model-response data-message-id="g-mixed-a"><message-content><p>新版模型节点</p></message-content></model-response>
+      </div>
+      <div class="conversation-container">
+        <user-query data-message-id="g-image-u"><div class="query-text"><p>生成一个像素示例</p></div></user-query>
+        <model-response data-message-id="g-image-a" data-is-generating="true">
+          <message-content>
+            <img alt="生成的像素" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==">
+          </message-content>
+        </model-response>
+      </div>
+      <model-response data-message-id="g-hidden" style="display: none">
+        <message-content><p>隐藏草稿不应导出</p></message-content>
+      </model-response>
+    </infinite-scroller>
+    <div id="result">Running...</div>
+
+    <script type="module">
+      import { extractCurrentGemini } from "../src/extract-gemini.js";
+      import { conversationFromDom } from "../src/conversation.js";
+      import { htmlToMarkdown } from "../src/html-to-markdown.js";
+
+      try {
+        const extracted = await extractCurrentGemini();
+        const conversation = conversationFromDom(extracted.payload, htmlToMarkdown, { provider: "gemini" });
+        const markdown = conversation.messages.map((message) => message.markdown).join("\n");
+        const checks = {
+          kind: extracted.kind === "dom",
+          provider: conversation.provider === "gemini",
+          roles: conversation.messages.map((message) => message.role).join(",")
+            === "user,assistant,user,assistant,user,assistant,user,assistant,user,assistant,user,assistant",
+          count: conversation.stats.messageCount === 12 && conversation.stats.roundCount === 6,
+          ids: conversation.messages.slice(0, 4).map((message) => message.id).join(",")
+            === "g-u-1,g-a-1,g-u-2,g-a-2",
+          repeatedMessages: conversation.messages.filter((message) => /重复问题|重复回答/.test(message.markdown)).length === 4
+            && new Set(conversation.messages.slice(4, 8).map((message) => message.id)).size === 4,
+          mixedDom: markdown.includes("旧版用户节点") && markdown.includes("新版模型节点"),
+          imageOnly: markdown.includes("![生成的像素](data:image/gif;base64,"),
+          hiddenDraftRemoved: !markdown.includes("隐藏草稿不应导出"),
+          generating: extracted.payload.isGenerating === true && conversation.incomplete === true,
+          code: markdown.includes("```ts") && markdown.includes("const ready = true;"),
+          codeMirror: markdown.includes("```js") && markdown.includes("const first = 1;\nconst second = 2;"),
+          table: markdown.includes("| 状态 | 值 |"),
+          math: markdown.includes("$E = mc^2$"),
+          source: conversation.messages[1].sources.length === 1,
+          controlsRemoved: !markdown.includes("复制代码") && !markdown.includes("复制回答") && !markdown.includes("赞"),
+          hiddenTextRemoved: !markdown.includes("你说："),
+          unsafeLinkRemoved: markdown.includes("危险链接") && !markdown.includes("javascript:"),
+        };
+        const passed = Object.values(checks).every(Boolean);
+        window.__fixtureResult = { passed, checks, conversation };
+        document.getElementById("result").textContent = passed ? "PASS" : `FAIL ${JSON.stringify(checks)}`;
+        document.getElementById("result").dataset.passed = String(passed);
+      } catch (error) {
+        window.__fixtureResult = { passed: false, error: error.message };
+        document.getElementById("result").textContent = `FAIL ${error.message}`;
+        document.getElementById("result").dataset.passed = "false";
+      }
+    </script>
+  </body>
+</html>

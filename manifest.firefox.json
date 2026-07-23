@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "AI Chat to Obsidian",
+  "version": "0.5.0",
+  "description": "Send complete ChatGPT and Gemini conversations to an Obsidian vault as Markdown.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "clipboardWrite",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Export AI chat to Obsidian",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ],
+    "type": "module"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "chatgpt-to-obsidian@local",
+      "strict_min_version": "128.0"
+    }
+  }
+}

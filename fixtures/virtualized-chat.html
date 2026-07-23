@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <title>窗口化长对话测试 - ChatGPT</title>
+    <style>
+      body { margin: 28px; font: 14px/1.45 system-ui, sans-serif; }
+      #chat-scroll { position: relative; width: 620px; height: 320px; overflow-y: auto; border: 1px solid #999; }
+      #spacer { height: 1440px; }
+      #turns { position: absolute; inset: 0 0 auto; }
+      section { position: absolute; left: 0; width: 100%; height: 120px; padding: 16px; border-bottom: 1px solid #ddd; background: white; }
+      #result { margin-top: 16px; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <h1>Virtualized ChatGPT fixture</h1>
+    <div id="chat-scroll">
+      <div id="spacer"></div>
+      <div id="turns"></div>
+    </div>
+    <div id="result">Running...</div>
+
+    <script type="module">
+      import { extractCurrentChat } from "../src/extract-page.js";
+      import { conversationFromDom } from "../src/conversation.js";
+      import { htmlToMarkdown } from "../src/html-to-markdown.js";
+
+      const items = Array.from({ length: 12 }, (_, index) => ({
+        id: `${index % 2 === 0 ? "u" : "a"}${Math.floor(index / 2) + 1}`,
+        role: index % 2 === 0 ? "user" : "assistant",
+        text: index % 2 === 0
+          ? `第 ${Math.floor(index / 2) + 1} 个问题`
+          : `第 ${Math.floor(index / 2) + 1} 个回答，包含 **Markdown**。`,
+      }));
+      const scroll = document.getElementById("chat-scroll");
+      const turns = document.getElementById("turns");
+
+      function renderWindow() {
+        const start = Math.max(0, Math.min(items.length - 3, Math.floor(scroll.scrollTop / 120)));
+        turns.replaceChildren(...items.slice(start, start + 3).map((item, offset) => {
+          const section = document.createElement("section");
+          section.dataset.turnId = item.id;
+          section.dataset.turn = item.role;
+          section.style.top = `${(start + offset) * 120}px`;
+          const message = document.createElement("div");
+          message.dataset.messageAuthorRole = item.role;
+          const content = document.createElement("div");
+          content.className = item.role === "assistant" ? "markdown prose" : "whitespace-pre-wrap";
+          if (item.role === "assistant") content.innerHTML = `<p>${item.text}</p>`;
+          else content.textContent = item.text;
+          message.append(content);
+          section.append(message);
+          return section;
+        }));
+      }
+
+      scroll.addEventListener("scroll", renderWindow);
+      scroll.scrollTop = scroll.scrollHeight;
+      renderWindow();
+
+      try {
+        const extracted = await extractCurrentChat();
+        const conversation = conversationFromDom(extracted.payload, htmlToMarkdown);
+        const ids = conversation.messages.map((message) => message.id);
+        const checks = {
+          count: conversation.stats.messageCount === 12,
+          rounds: conversation.stats.roundCount === 6,
+          first: ids[0] === "u1",
+          last: ids.at(-1) === "a6",
+          complete: extracted.payload.scroll.complete === true,
+          restored: scroll.scrollTop > 1000,
+        };
+        const passed = Object.values(checks).every(Boolean);
+        window.__fixtureResult = { passed, checks, ids, scroll: extracted.payload.scroll };
+        document.getElementById("result").textContent = passed ? "PASS" : `FAIL ${JSON.stringify({ checks, ids })}`;
+        document.getElementById("result").dataset.passed = String(passed);
+      } catch (error) {
+        window.__fixtureResult = { passed: false, error: error.message };
+        document.getElementById("result").textContent = `FAIL ${error.message}`;
+        document.getElementById("result").dataset.passed = "false";
+      }
+    </script>
+  </body>
+</html>

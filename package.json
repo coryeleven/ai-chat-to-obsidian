@@ -1,0 +1,24 @@
+{
+  "name": "ai-chat-to-obsidian",
+  "version": "0.5.0",
+  "description": "Export complete ChatGPT and Gemini conversations to Obsidian Markdown.",
+  "private": true,
+  "license": "MIT",
+  "keywords": [
+    "browser-extension",
+    "chatgpt",
+    "gemini",
+    "obsidian"
+  ],
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node scripts/check.mjs",
+    "build": "node scripts/build.mjs",
+    "smoke:firefox": "node scripts/firefox-smoke.mjs",
+    "smoke:gemini": "node scripts/gemini-fixture-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

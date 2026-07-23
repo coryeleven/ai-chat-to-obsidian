@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <title>Gemini 窗口化长对话测试 - Google Gemini</title>
+    <style>
+      body { margin: 28px; font: 14px/1.45 system-ui, sans-serif; }
+      infinite-scroller {
+        position: relative;
+        width: 620px;
+        height: 300px;
+        display: block;
+        overflow-y: scroll;
+        border: 1px solid #999;
+      }
+      #spacer { height: 2000px; }
+      #turns { position: absolute; inset: 0 0 auto; }
+      user-query, model-response {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        height: 100px;
+        display: block;
+        padding: 15px;
+        border-bottom: 1px solid #ddd;
+        background: white;
+      }
+      message-content { display: block; }
+      #result { margin-top: 16px; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <h1>Virtualized Gemini fixture</h1>
+    <infinite-scroller id="chat-scroll" data-test-id="chat-history-container">
+      <div id="spacer"></div>
+      <div id="turns"></div>
+    </infinite-scroller>
+    <div id="result">Running...</div>
+
+    <script type="module">
+      import { extractCurrentGemini } from "../src/extract-gemini.js";
+      import { conversationFromDom } from "../src/conversation.js";
+      import { htmlToMarkdown } from "../src/html-to-markdown.js";
+
+      const items = Array.from({ length: 20 }, (_, index) => ({
+        id: `${index % 2 === 0 ? "u" : "a"}${Math.floor(index / 2) + 1}`,
+        role: index % 2 === 0 ? "user" : "assistant",
+        text: index % 2 === 0
+          ? `Gemini 第 ${Math.floor(index / 2) + 1} 个问题`
+          : `Gemini 第 ${Math.floor(index / 2) + 1} 个回答`,
+      }));
+      const scroll = document.getElementById("chat-scroll");
+      const turns = document.getElementById("turns");
+
+      function renderWindow() {
+        const start = Math.max(0, Math.min(items.length - 4, Math.floor(scroll.scrollTop / 100)));
+        turns.replaceChildren(...items.slice(start, start + 4).map((item, offset) => {
+          const element = document.createElement(item.role === "user" ? "user-query" : "model-response");
+          element.style.top = `${(start + offset) * 100}px`;
+          if (item.role === "user") {
+            const content = document.createElement("div");
+            content.className = "query-text";
+            content.textContent = item.text;
+            element.append(content);
+          } else {
+            const content = document.createElement("message-content");
+            content.innerHTML = `<p>${item.text}</p>`;
+            element.append(content);
+          }
+          return element;
+        }));
+      }
+
+      scroll.addEventListener("scroll", renderWindow);
+      scroll.scrollTop = scroll.scrollHeight;
+      renderWindow();
+      const initialBottomDistance = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop;
+
+      try {
+        const extracted = await extractCurrentGemini();
+        const conversation = conversationFromDom(extracted.payload, htmlToMarkdown, { provider: "gemini" });
+        const ids = conversation.messages.map((message) => message.id);
+        const markdownMessages = conversation.messages.map((message) => message.markdown);
+        const restoredBottomDistance = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop;
+        const checks = {
+          count: conversation.stats.messageCount === 20,
+          rounds: conversation.stats.roundCount === 10,
+          order: markdownMessages.join(",") === items.map((item) => item.text).join(","),
+          uniqueFallbackIds: new Set(ids).size === 20,
+          complete: extracted.payload.scroll.complete === true,
+          reachedTop: extracted.payload.scroll.reachedTop === true,
+          reachedBottom: extracted.payload.scroll.reachedBottom === true,
+          restored: Math.abs(restoredBottomDistance - initialBottomDistance) <= 1,
+        };
+        const passed = Object.values(checks).every(Boolean);
+        window.__fixtureResult = {
+          passed,
+          checks,
+          ids,
+          markdownMessages,
+          scroll: extracted.payload.scroll,
+          restoredBottomDistance,
+        };
+        document.getElementById("result").textContent = passed ? "PASS" : `FAIL ${JSON.stringify({ checks, ids })}`;
+        document.getElementById("result").dataset.passed = String(passed);
+      } catch (error) {
+        window.__fixtureResult = { passed: false, error: error.message };
+        document.getElementById("result").textContent = `FAIL ${error.message}`;
+        document.getElementById("result").dataset.passed = "false";
+      }
+    </script>
+  </body>
+</html>

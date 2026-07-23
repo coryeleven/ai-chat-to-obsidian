@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <title>DOM 提取测试 - ChatGPT</title>
+    <style>
+      body { margin: 32px; font: 15px/1.5 system-ui, sans-serif; }
+      #result { padding: 12px; border: 1px solid #aaa; }
+      article { margin: 18px 0; }
+    </style>
+  </head>
+  <body>
+    <h1>ChatGPT DOM fixture</h1>
+    <div id="conversation">
+      <article data-message-id="u-1">
+        <div data-message-author-role="user"><div class="whitespace-pre-wrap">请给我一个代码示例。</div></div>
+      </article>
+      <article data-message-id="a-1">
+        <div data-message-author-role="assistant">
+          <div class="markdown prose">
+            <p>这是一个 <strong>TypeScript</strong> 示例：<a href="javascript:alert('unsafe')">危险链接</a></p>
+            <pre><button>Copy</button><code class="language-ts">const ready = true;
+console.log(ready);</code></pre>
+            <table>
+              <thead><tr><th>状态</th><th>值</th></tr></thead>
+              <tbody><tr><td>ready</td><td>true</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+      <article data-message-id="u-2">
+        <div data-message-author-role="user"><div class="whitespace-pre-wrap">再给一个公式。</div></div>
+      </article>
+      <article data-message-id="a-2">
+        <div data-message-author-role="assistant">
+          <div class="markdown prose">
+            <p>退避时间是 <span class="katex"><annotation encoding="application/x-tex">d_n = 2^n</annotation></span>。</p>
+            <button aria-label="Copy">Copy</button>
+          </div>
+        </div>
+      </article>
+    </div>
+    <div id="result">Running...</div>
+    <script type="module">
+      import { extractCurrentChat } from "../src/extract-page.js";
+      import { conversationFromDom } from "../src/conversation.js";
+      import { htmlToMarkdown } from "../src/html-to-markdown.js";
+
+      try {
+        const extracted = await extractCurrentChat();
+        const conversation = conversationFromDom(extracted.payload, htmlToMarkdown);
+        const markdown = conversation.messages.map((item) => item.markdown).join("\n");
+        const checks = {
+          kind: extracted.kind === "dom",
+          count: conversation.stats.messageCount === 4,
+          code: markdown.includes("```ts") && markdown.includes("const ready = true;"),
+          table: markdown.includes("| 状态 | 值 |"),
+          math: markdown.includes("$d_n = 2^n$"),
+          controlsRemoved: !markdown.includes("Copy"),
+          unsafeLinkRemoved: markdown.includes("危险链接") && !markdown.includes("javascript:"),
+        };
+        const passed = Object.values(checks).every(Boolean);
+        window.__fixtureResult = { passed, checks, conversation };
+        document.getElementById("result").textContent = passed ? "PASS" : `FAIL ${JSON.stringify(checks)}`;
+        document.getElementById("result").dataset.passed = String(passed);
+      } catch (error) {
+        window.__fixtureResult = { passed: false, error: error.message };
+        document.getElementById("result").textContent = `FAIL ${error.message}`;
+        document.getElementById("result").dataset.passed = "false";
+      }
+    </script>
+  </body>
+</html>
