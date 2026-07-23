@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildConversationMarkdown,
   conversationFromApi,
   conversationFromDom,
   conversationToMarkdown,
@@ -95,6 +96,36 @@ test("renders Obsidian Markdown with minimal metadata and sources by default", (
   assert.match(markdown, /## User\n\nFirst question/);
   assert.match(markdown, /> \[!info\]- Sources/);
   assert.match(markdown, /\[Reliable queues\]\(https:\/\/example.com\/queues\)/);
+});
+
+test("builds structured properties from the same Markdown document", () => {
+  const conversation = conversationFromApi(conversationPayload(), {
+    sourceUrl: "https://chatgpt.com/c/conversation-12345678",
+  });
+  const importedAt = new Date("2026-07-21T08:00:00.000Z");
+  const document = buildConversationMarkdown(conversation, importedAt, {
+    detailedMetadata: true,
+  });
+
+  assert.deepEqual(document.properties, [
+    { name: "title", value: "Queue design / production?" },
+    { name: "source", value: "https://chatgpt.com/c/conversation-12345678" },
+    { name: "conversation_id", value: "conversation-12345678" },
+    { name: "provider", value: "chatgpt" },
+    { name: "created", value: "2023-11-14T22:13:20.000Z" },
+    { name: "updated", value: "2023-11-14T22:21:40.000Z" },
+    { name: "imported", value: "2026-07-21T08:00:00.000Z" },
+    { name: "messages", value: 4 },
+    { name: "rounds", value: 2 },
+    { name: "extraction", value: "api" },
+    { name: "tags", value: ["chatgpt", "ai-conversation"] },
+  ]);
+  assert.equal(document.markdown, conversationToMarkdown(conversation, importedAt, {
+    detailedMetadata: true,
+  }));
+  assert.match(document.frontmatter, /^---\ntitle:/);
+  assert.match(document.body, /^# Queue design \/ production\?/);
+  assert.doesNotMatch(document.body, /^---/);
 });
 
 test("adds detailed metadata when requested while preserving importedAt", () => {

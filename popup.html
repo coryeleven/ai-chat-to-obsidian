@@ -11,13 +11,14 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body class="popup-page">
-    <main id="app-shell" class="app-shell" aria-busy="false">
+    <main id="app-shell" class="app-shell popup" aria-busy="false">
       <header class="topbar">
         <div class="brand">
           <img class="brand-mark" src="icons/mark.svg" alt="">
           <h1>AI Chat to Obsidian</h1>
         </div>
         <div class="topbar-actions">
+          <!-- Lucide paths are inlined so the extension keeps its dependency-free CSP. -->
           <button id="settings-button" class="icon-button" type="button" aria-label="打开设置" title="打开设置">
             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
@@ -70,7 +71,7 @@
             <h2 id="conversation-title"></h2>
             <div class="conversation-subline">
               <p id="conversation-meta" class="muted"></p>
-              <span class="meta-separator" aria-hidden="true">·</span>
+              <span id="status-separator" class="meta-separator" aria-hidden="true">·</span>
               <span id="extraction-badge" class="badge">页面已解析</span>
             </div>
           </header>
@@ -81,27 +82,14 @@
           </div>
 
           <section class="transfer-group" aria-label="导出详情">
-            <button id="edit-destination-button" class="destination-section" type="button" aria-label="编辑保存位置" title="编辑保存位置">
-              <svg class="row-icon destination-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v7A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"></path>
-              </svg>
-              <span class="destination-copy">
-                <span class="eyebrow">保存到</span>
-                <strong id="destination-name">当前仓库 / AI Chats</strong>
-              </span>
-              <svg class="chevron-icon destination-chevron" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m9 18 6-6-6-6"></path>
-              </svg>
-            </button>
-
-            <details id="preview-section" class="preview-section">
+            <details id="preview-section" class="preview-section" open>
               <summary>
                 <span class="preview-summary-copy">
                   <strong>Markdown 预览</strong>
                   <small id="markdown-stats">正在校验正文</small>
                 </span>
                 <span class="preview-summary-trailing">
-                  <span class="preview-actions" aria-label="Markdown 操作">
+                  <span class="preview-actions" role="group" aria-label="Markdown 操作">
                     <button id="copy-button" class="ghost-button" type="button" aria-label="复制 Markdown" title="复制 Markdown">
                       <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <rect x="8" y="8" width="12" height="12" rx="2"></rect>
@@ -110,35 +98,104 @@
                     </button>
                     <button id="download-button" class="ghost-button" type="button" aria-label="下载 Markdown" title="下载 Markdown">
                       <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 3v12"></path>
-                        <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
-                        <path d="M5 20h14"></path>
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <path d="m7 10 5 5 5-5"></path>
+                        <path d="M12 15V3"></path>
+                      </svg>
+                    </button>
+                    <button
+                      id="preview-toggle-button"
+                      class="ghost-button preview-toggle-button"
+                      type="button"
+                      aria-label="收起 Markdown"
+                      aria-controls="markdown-preview-content"
+                      aria-expanded="true"
+                      title="收起 Markdown"
+                    >
+                      <svg class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m6 9 6 6 6-6"></path>
                       </svg>
                     </button>
                   </span>
-                  <svg class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m8 10 4 4 4-4"></path>
-                  </svg>
                 </span>
               </summary>
-              <div class="preview-content">
-                <div class="preview-file-row">
-                  <span>文件</span>
-                  <code id="filename-label"></code>
-                </div>
-                <textarea id="markdown-preview" readonly spellcheck="false" aria-label="Markdown 预览"></textarea>
+              <div id="markdown-preview-content" class="preview-content">
+                <section class="properties-preview" aria-labelledby="properties-heading">
+                  <div class="properties-heading">
+                    <strong id="properties-heading">属性</strong>
+                    <span id="properties-count" aria-live="polite"></span>
+                  </div>
+                  <dl id="properties-list" class="properties-list"></dl>
+                </section>
+
+                <details id="markdown-body-section" class="markdown-body-section">
+                  <summary>
+                    <span class="markdown-body-summary">
+                      <strong>Markdown 正文</strong>
+                      <code id="filename-label"></code>
+                    </span>
+                    <svg class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m6 9 6 6 6-6"></path>
+                    </svg>
+                  </summary>
+                  <pre id="markdown-preview" role="region" tabindex="0" aria-label="Markdown 正文预览"></pre>
+                </details>
               </div>
             </details>
+
+            <section id="save-settings-section" class="save-settings-section" aria-labelledby="save-settings-title">
+              <h3 id="save-settings-title">保存设置</h3>
+
+              <button id="edit-destination-button" class="destination-section" type="button" aria-label="编辑保存位置" title="编辑保存位置">
+                <svg class="row-icon destination-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v7A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"></path>
+                </svg>
+                <span class="destination-copy">
+                  <span class="eyebrow">保存到</span>
+                  <strong id="destination-name">当前仓库 / AI Chats</strong>
+                </span>
+                <svg class="chevron-icon destination-chevron" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6"></path>
+                </svg>
+              </button>
+
+              <div class="inline-settings-options">
+                <label class="toggle-row" for="silent-open-input">
+                  <span>
+                    <strong>后台保存</strong>
+                    <small>不在 Obsidian 中打开新笔记</small>
+                  </span>
+                  <input id="silent-open-input" name="silentOpen" type="checkbox" role="switch">
+                </label>
+
+                <label class="toggle-row" for="detailed-metadata-input">
+                  <span>
+                    <strong>详细属性</strong>
+                    <small>包含时间、消息数和导出方式</small>
+                  </span>
+                  <input id="detailed-metadata-input" name="detailedMetadata" type="checkbox" role="switch">
+                </label>
+              </div>
+            </section>
           </section>
         </div>
 
         <footer class="action-dock">
           <p id="save-status-message" class="save-status-message" role="status" aria-live="polite"></p>
-          <button id="save-button" class="primary-button save-button" type="button">
+          <button
+            id="save-button"
+            class="primary-button save-button"
+            type="button"
+            data-state="disabled"
+            aria-busy="false"
+            aria-describedby="save-status-message"
+            disabled
+          >
             <span class="save-button-content">
               <svg id="save-button-icon" class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M7 17 17 7"></path>
-                <path d="M7 7h10v10"></path>
+                <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path>
+                <path d="M17 21v-8H7v8"></path>
+                <path d="M7 3v5h8"></path>
               </svg>
               <span id="save-button-label">保存到 Obsidian</span>
             </span>
@@ -154,8 +211,8 @@
       <form id="settings-form" class="settings-form">
         <header class="dialog-header">
           <div>
-            <span class="eyebrow">Obsidian</span>
-            <h2 id="settings-dialog-title">保存设置</h2>
+            <span class="eyebrow">保存设置</span>
+            <h2 id="settings-dialog-title">仓库与目录</h2>
           </div>
           <button id="close-settings-button" class="icon-button" type="button" aria-label="关闭设置" title="关闭">
             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -173,22 +230,6 @@
         <label class="field-row" for="folder-input">
           <span>文件夹</span>
           <input id="folder-input" name="folder" type="text" maxlength="240" placeholder="AI Chats" autocomplete="off">
-        </label>
-
-        <label class="toggle-row" for="silent-open-input">
-          <span>
-            <strong>后台保存</strong>
-            <small>不在 Obsidian 中打开新笔记</small>
-          </span>
-          <input id="silent-open-input" name="silentOpen" type="checkbox" role="switch">
-        </label>
-
-        <label class="toggle-row" for="detailed-metadata-input">
-          <span>
-            <strong>详细属性</strong>
-            <small>包含时间、消息数和导出方式</small>
-          </span>
-          <input id="detailed-metadata-input" name="detailedMetadata" type="checkbox" role="switch">
         </label>
 
         <p id="settings-error-message" class="settings-error-message" role="alert" aria-live="assertive"></p>

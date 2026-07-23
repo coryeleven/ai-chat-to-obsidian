@@ -315,38 +315,45 @@ function resolveMarkdownArguments(importedAtOrOptions, maybeOptions) {
   };
 }
 
-export function conversationToMarkdown(
-  conversation,
-  importedAtOrOptions = new Date(),
-  maybeOptions = {},
-) {
-  const { importedAt, options } = resolveMarkdownArguments(importedAtOrOptions, maybeOptions);
+function buildConversationProperties(conversation, importedAt, options) {
   const detailedMetadata = options.detailedMetadata === true;
+  const provider = providerById(conversation.provider) || providerById("chatgpt");
   const properties = [
-    "---",
-    `title: ${yamlString(conversation.title)}`,
-    `source: ${yamlString(conversation.sourceUrl)}`,
-    `conversation_id: ${yamlString(conversation.id)}`,
+    { name: "title", value: String(conversation.title ?? "") },
+    { name: "source", value: String(conversation.sourceUrl ?? "") },
+    { name: "conversation_id", value: String(conversation.id ?? "") },
   ];
 
   if (detailedMetadata) {
     properties.push(
-      `provider: ${yamlString(conversation.provider)}`,
-      `created: ${yamlString(isoDate(conversation.createdAt, importedAt))}`,
-      `updated: ${yamlString(isoDate(conversation.updatedAt, importedAt))}`,
-      `imported: ${yamlString(importedAt.toISOString())}`,
-      `messages: ${conversation.stats.messageCount}`,
-      `rounds: ${conversation.stats.roundCount}`,
-      `extraction: ${yamlString(conversation.extractionMethod)}`,
+      { name: "provider", value: String(conversation.provider ?? "") },
+      { name: "created", value: isoDate(conversation.createdAt, importedAt) },
+      { name: "updated", value: isoDate(conversation.updatedAt, importedAt) },
+      { name: "imported", value: importedAt.toISOString() },
+      { name: "messages", value: conversation.stats.messageCount },
+      { name: "rounds", value: conversation.stats.roundCount },
+      { name: "extraction", value: String(conversation.extractionMethod ?? "") },
     );
   }
 
-  const provider = providerById(conversation.provider) || providerById("chatgpt");
-  properties.push("tags:", `  - ${provider.tag}`);
-  if (detailedMetadata) properties.push("  - ai-conversation");
-  properties.push("---");
+  const tags = [provider.tag];
+  if (detailedMetadata) tags.push("ai-conversation");
+  properties.push({ name: "tags", value: tags });
+  return properties;
+}
 
-  const body = conversation.messages.map((message) => {
+function propertiesToYaml(properties) {
+  return properties.flatMap(({ name, value }) => {
+    if (Array.isArray(value)) {
+      return [`${name}:`, ...value.map((item) => `  - ${String(item)}`)];
+    }
+    if (typeof value === "number") return `${name}: ${value}`;
+    return `${name}: ${yamlString(value)}`;
+  });
+}
+
+function conversationBodyToMarkdown(conversation, provider) {
+  const messages = conversation.messages.map((message) => {
     const label = message.role === "user" ? "User" : "Assistant";
     return `## ${label}\n\n${message.markdown}${renderSources(message.sources)}`.trim();
   });
@@ -355,7 +362,33 @@ export function conversationToMarkdown(
     ? `> [!warning] Incomplete export\n> ${provider.label} was still generating a response when this note was exported.\n\n`
     : "";
 
-  return `${properties.join("\n")}\n\n# ${conversation.title}\n\n${incompleteNotice}${body.join("\n\n---\n\n")}\n`;
+  return `# ${conversation.title}\n\n${incompleteNotice}${messages.join("\n\n---\n\n")}`;
+}
+
+export function buildConversationMarkdown(
+  conversation,
+  importedAtOrOptions = new Date(),
+  maybeOptions = {},
+) {
+  const { importedAt, options } = resolveMarkdownArguments(importedAtOrOptions, maybeOptions);
+  const provider = providerById(conversation.provider) || providerById("chatgpt");
+  const properties = buildConversationProperties(conversation, importedAt, options);
+  const body = conversationBodyToMarkdown(conversation, provider);
+  const frontmatter = ["---", ...propertiesToYaml(properties), "---"].join("\n");
+  return {
+    body,
+    frontmatter,
+    markdown: `${frontmatter}\n\n${body}\n`,
+    properties,
+  };
+}
+
+export function conversationToMarkdown(
+  conversation,
+  importedAtOrOptions = new Date(),
+  maybeOptions = {},
+) {
+  return buildConversationMarkdown(conversation, importedAtOrOptions, maybeOptions).markdown;
 }
 
 export function safeFilename(conversation) {
