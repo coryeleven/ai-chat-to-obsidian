@@ -52,5 +52,5 @@ export function formatMarkdownStats(stats) {
   const size = stats.bytes < 1024
     ? `${stats.bytes} B`
     : `${(stats.bytes / 1024).toFixed(1)} KB`;
-  return `${stats.messageSections} 段正文 · ${size}`;
+  return `${stats.messageSections} 个内容段落 · ${size}`;
 }

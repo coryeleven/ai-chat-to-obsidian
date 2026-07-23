@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
-  v3 assumptions: this is a compact, repeated-use tool. The conversation title is primary,
-  transfer details share one surface, and the popup height is driven by actual content.
+  The popup is a compact repeated-use tool: page context scrolls independently while the
+  primary Obsidian action stays visible. Existing element IDs remain stable for runtime code.
 -->
 <html lang="zh-CN">
   <head>
@@ -18,10 +18,10 @@
           <h1>AI Chat to Obsidian</h1>
         </div>
         <div class="topbar-actions">
-          <button id="settings-button" class="icon-button" type="button" aria-label="保存设置" title="保存设置">
+          <button id="settings-button" class="icon-button" type="button" aria-label="打开设置" title="打开设置">
             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path>
-              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.42 1.42-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.04 1.56V20h-2v-.08a1.7 1.7 0 0 0-1.04-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.42-1.42.06-.06A1.7 1.7 0 0 0 9.4 15.4a1.7 1.7 0 0 0-1.56-1.04H7.5v-2h.34A1.7 1.7 0 0 0 9.4 11.3a1.7 1.7 0 0 0-.34-1.88L9 9.36l1.42-1.42.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 13.4 6.8V6h2v.8a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.42 1.42-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.04h.54v2h-.54A1.7 1.7 0 0 0 19.4 15z"></path>
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
             </svg>
           </button>
           <button id="refresh-button" class="icon-button" type="button" aria-label="重新读取" title="重新读取">
@@ -36,7 +36,10 @@
       </header>
 
       <section id="loading-view" class="state-view" aria-live="polite">
-        <span class="spinner" aria-hidden="true"></span>
+        <svg class="state-icon spinner" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 3a9 9 0 0 1 9 9"></path>
+        </svg>
         <p>正在读取当前对话...</p>
       </section>
 
@@ -62,66 +65,75 @@
       </section>
 
       <section id="conversation-view" class="conversation-view" hidden>
-        <header class="conversation-heading">
-          <h2 id="conversation-title"></h2>
-          <div class="conversation-subline">
-            <p id="conversation-meta" class="muted"></p>
-            <span id="extraction-badge" class="badge">完整数据</span>
-          </div>
-        </header>
+        <div class="conversation-scroll">
+          <header class="conversation-heading">
+            <h2 id="conversation-title"></h2>
+            <div class="conversation-subline">
+              <p id="conversation-meta" class="muted"></p>
+              <span class="meta-separator" aria-hidden="true">·</span>
+              <span id="extraction-badge" class="badge">页面已解析</span>
+            </div>
+          </header>
 
-        <div id="warning-panel" class="warning-panel" role="alert" hidden>
-          <strong>导出提示</strong>
-          <p id="warning-message"></p>
+          <div id="warning-panel" class="warning-panel" role="alert" hidden>
+            <strong>导出提示</strong>
+            <p id="warning-message"></p>
+          </div>
+
+          <section class="transfer-group" aria-label="导出详情">
+            <button id="edit-destination-button" class="destination-section" type="button" aria-label="编辑保存位置" title="编辑保存位置">
+              <svg class="row-icon destination-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v7A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"></path>
+              </svg>
+              <span class="destination-copy">
+                <span class="eyebrow">保存到</span>
+                <strong id="destination-name">当前仓库 / AI Chats</strong>
+              </span>
+              <svg class="chevron-icon destination-chevron" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m9 18 6-6-6-6"></path>
+              </svg>
+            </button>
+
+            <details id="preview-section" class="preview-section">
+              <summary>
+                <span class="preview-summary-copy">
+                  <strong>Markdown 预览</strong>
+                  <small id="markdown-stats">正在校验正文</small>
+                </span>
+                <span class="preview-summary-trailing">
+                  <span class="preview-actions" aria-label="Markdown 操作">
+                    <button id="copy-button" class="ghost-button" type="button" aria-label="复制 Markdown" title="复制 Markdown">
+                      <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                        <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+                      </svg>
+                    </button>
+                    <button id="download-button" class="ghost-button" type="button" aria-label="下载 Markdown" title="下载 Markdown">
+                      <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 3v12"></path>
+                        <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
+                        <path d="M5 20h14"></path>
+                      </svg>
+                    </button>
+                  </span>
+                  <svg class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m8 10 4 4 4-4"></path>
+                  </svg>
+                </span>
+              </summary>
+              <div class="preview-content">
+                <div class="preview-file-row">
+                  <span>文件</span>
+                  <code id="filename-label"></code>
+                </div>
+                <textarea id="markdown-preview" readonly spellcheck="false" aria-label="Markdown 预览"></textarea>
+              </div>
+            </details>
+          </section>
         </div>
 
-        <section class="transfer-group" aria-label="导出详情">
-          <button id="edit-destination-button" class="destination-section" type="button" aria-label="编辑保存位置" title="编辑保存位置">
-            <svg class="row-icon destination-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v7A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"></path>
-            </svg>
-            <span class="destination-copy">
-              <span class="eyebrow">保存到</span>
-              <strong id="destination-name">当前 Vault / AI Chats</strong>
-            </span>
-            <svg class="chevron-icon destination-chevron" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m9 18 6-6-6-6"></path>
-            </svg>
-          </button>
-
-          <details id="preview-section" class="preview-section">
-            <summary>
-              <span class="preview-summary-copy">
-                <strong>查看 Markdown</strong>
-                <small id="markdown-stats">正在校验正文</small>
-              </span>
-              <span class="preview-summary-trailing">
-                <code id="filename-label"></code>
-                <span class="preview-actions" aria-label="Markdown 操作">
-                  <button id="copy-button" class="ghost-button" type="button" aria-label="复制 Markdown" title="复制 Markdown">
-                    <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-                      <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
-                    </svg>
-                  </button>
-                  <button id="download-button" class="ghost-button" type="button" aria-label="下载 Markdown" title="下载 Markdown">
-                    <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M12 3v12"></path>
-                      <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
-                      <path d="M5 20h14"></path>
-                    </svg>
-                  </button>
-                </span>
-                <svg class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m8 10 4 4 4-4"></path>
-                </svg>
-              </span>
-            </summary>
-            <textarea id="markdown-preview" readonly spellcheck="false" aria-label="Markdown 预览"></textarea>
-          </details>
-        </section>
-
-        <div class="action-dock">
+        <footer class="action-dock">
+          <p id="save-status-message" class="save-status-message" role="status" aria-live="polite"></p>
           <button id="save-button" class="primary-button save-button" type="button">
             <span class="save-button-content">
               <svg id="save-button-icon" class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -132,18 +144,18 @@
             </span>
             <kbd id="save-shortcut" class="save-shortcut">⌘ ↵</kbd>
           </button>
-        </div>
+        </footer>
       </section>
 
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     </main>
 
-    <dialog id="settings-dialog" class="settings-dialog">
+    <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-dialog-title">
       <form id="settings-form" class="settings-form">
         <header class="dialog-header">
           <div>
             <span class="eyebrow">Obsidian</span>
-            <h2>保存设置</h2>
+            <h2 id="settings-dialog-title">保存设置</h2>
           </div>
           <button id="close-settings-button" class="icon-button" type="button" aria-label="关闭设置" title="关闭">
             <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -154,8 +166,8 @@
         </header>
 
         <label class="field-row" for="vault-input">
-          <span>Vault 名称</span>
-          <input id="vault-input" name="vault" type="text" maxlength="120" placeholder="当前 Vault（可留空）" autocomplete="off">
+          <span>仓库名称</span>
+          <input id="vault-input" name="vault" type="text" maxlength="120" placeholder="当前仓库（可留空）" autocomplete="off">
         </label>
 
         <label class="field-row" for="folder-input">
@@ -178,6 +190,8 @@
           </span>
           <input id="detailed-metadata-input" name="detailedMetadata" type="checkbox" role="switch">
         </label>
+
+        <p id="settings-error-message" class="settings-error-message" role="alert" aria-live="assertive"></p>
 
         <footer class="dialog-actions">
           <button id="cancel-settings-button" class="quiet-button" type="button">取消</button>

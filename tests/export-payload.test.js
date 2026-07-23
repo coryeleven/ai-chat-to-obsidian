@@ -21,7 +21,7 @@ test("accepts a complete conversation document and reports its payload size", ()
   assert.equal(stats.messageSections, 8);
   assert.ok(stats.characters > 700);
   assert.ok(stats.bytes > 1200);
-  assert.match(formatMarkdownStats(stats), /^8 段正文 · \d+\.\d KB$/);
+  assert.match(formatMarkdownStats(stats), /^8 个内容段落 · \d+\.\d KB$/);
 });
 
 test("blocks a title-only document before transport", () => {

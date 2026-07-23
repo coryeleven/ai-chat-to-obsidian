@@ -30,7 +30,8 @@ const elements = Object.fromEntries([
   "conversation-title", "conversation-meta", "extraction-badge", "warning-panel", "warning-message",
   "destination-name", "preview-section", "filename-label", "markdown-preview", "markdown-stats", "refresh-button",
   "settings-button", "retry-button", "edit-destination-button", "save-button", "save-button-icon",
-  "save-button-label", "save-shortcut", "copy-button", "download-button", "toast", "settings-dialog", "settings-form",
+  "save-button-label", "save-shortcut", "save-status-message", "copy-button", "download-button", "toast",
+  "settings-dialog", "settings-form", "settings-error-message",
   "close-settings-button", "cancel-settings-button", "vault-input", "folder-input", "silent-open-input",
   "detailed-metadata-input",
 ].map((id) => [id, document.getElementById(id)]));
@@ -46,7 +47,11 @@ const state = {
   browserKind: "unknown",
   settings: { ...DEFAULT_SETTINGS },
   busy: false,
-  sent: false,
+  isMac: false,
+  saveStatus: "disabled",
+  saveMessage: "",
+  saveResetTimer: null,
+  copyFeedbackTimer: null,
   exportStats: null,
   toastTimer: null,
 };
@@ -81,7 +86,6 @@ function setBusy(busy) {
     elements["settings-button"],
     elements["retry-button"],
     elements["edit-destination-button"],
-    elements["save-button"],
     elements["copy-button"],
     elements["download-button"],
   ].forEach((button) => {
@@ -94,6 +98,8 @@ function showToast(message, kind = "success") {
   clearTimeout(state.toastTimer);
   elements.toast.textContent = message;
   elements.toast.dataset.kind = kind;
+  elements.toast.setAttribute("role", kind === "error" ? "alert" : "status");
+  elements.toast.setAttribute("aria-live", kind === "error" ? "assertive" : "polite");
   elements.toast.hidden = false;
   state.toastTimer = setTimeout(() => { elements.toast.hidden = true; }, 2600);
 }
@@ -122,20 +128,69 @@ function readableError(error) {
 }
 
 function renderSaveState() {
-  const buttonState = state.busy ? "loading" : state.sent ? "success" : "idle";
+  const buttonState = state.saveStatus;
+  const states = {
+    idle: {
+      label: "保存到 Obsidian",
+      icon: '<path d="M7 17 17 7"></path><path d="M7 7h10v10"></path>',
+    },
+    loading: {
+      label: "正在保存...",
+      icon: '<circle cx="12" cy="12" r="9"></circle><path d="M12 3a9 9 0 0 1 9 9"></path>',
+    },
+    success: {
+      label: "已保存",
+      icon: '<path d="m5 12 4 4L19 6"></path>',
+    },
+    error: {
+      label: "保存失败，重试",
+      icon: '<circle cx="12" cy="12" r="9"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path>',
+    },
+    disabled: {
+      label: "保存到 Obsidian",
+      icon: '<path d="M7 17 17 7"></path><path d="M7 7h10v10"></path>',
+    },
+  };
+  const presentation = states[buttonState] || states.disabled;
   elements["save-button"].dataset.state = buttonState;
-  elements["save-button-label"].textContent = buttonState === "loading"
-    ? "正在保存..."
-    : buttonState === "success" ? "已保存到 Obsidian" : "保存到 Obsidian";
-  elements["save-button-icon"].innerHTML = buttonState === "success"
-    ? '<path d="m5 12 4 4L19 6"></path>'
-    : buttonState === "loading"
-      ? '<circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 1 8 8"></path>'
-      : '<path d="M7 17 17 7"></path><path d="M7 7h10v10"></path>';
+  elements["save-button-label"].textContent = presentation.label;
+  elements["save-button-icon"].innerHTML = presentation.icon;
+  elements["save-button"].disabled = state.busy
+    || buttonState === "loading"
+    || buttonState === "success"
+    || buttonState === "disabled";
+  elements["save-button"].setAttribute("aria-busy", String(buttonState === "loading"));
+  elements["save-status-message"].textContent = state.saveMessage;
+  elements["save-status-message"].title = state.saveMessage;
+  elements["save-status-message"].dataset.kind = buttonState;
+}
+
+function setSaveStatus(status, message = "") {
+  if (status !== "success") clearTimeout(state.saveResetTimer);
+  state.saveStatus = status;
+  state.saveMessage = message;
+  renderSaveState();
+}
+
+function showCopyFeedback() {
+  clearTimeout(state.copyFeedbackTimer);
+  elements["copy-button"].dataset.state = "success";
+  elements["copy-button"].setAttribute("aria-label", "Markdown 已复制");
+  elements["copy-button"].title = "Markdown 已复制";
+  elements["copy-button"].querySelector("svg").innerHTML = '<path d="m5 12 4 4L19 6"></path>';
+  state.copyFeedbackTimer = setTimeout(() => {
+    elements["copy-button"].dataset.state = "idle";
+    elements["copy-button"].setAttribute("aria-label", "复制 Markdown");
+    elements["copy-button"].title = "复制 Markdown";
+    elements["copy-button"].querySelector("svg").innerHTML = [
+      '<rect x="8" y="8" width="12" height="12" rx="2"></rect>',
+      '<path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>',
+    ].join("");
+  }, 1500);
 }
 
 function renderDestination() {
-  const label = destinationLabel(state.settings);
+  const label = destinationLabel(state.settings).replace(/^当前 Vault(?=\s|$)/, "当前仓库");
   elements["destination-name"].textContent = label;
   elements["destination-name"].title = label;
 }
@@ -155,17 +210,16 @@ function updateMarkdown() {
 function renderConversation(conversation) {
   state.conversation = conversation;
   state.filename = safeFilename(conversation);
-  state.sent = false;
+  setSaveStatus("idle");
   updateMarkdown();
 
   elements["conversation-title"].textContent = conversation.title;
+  elements["conversation-title"].title = conversation.title;
   const provider = providerById(conversation.provider) || providerById("chatgpt");
   elements["conversation-meta"].textContent = `${conversation.stats.messageCount} 条消息 · ${conversation.stats.roundCount} 轮对话 · ${provider.label}`;
   elements["extraction-badge"].dataset.method = conversation.extractionMethod;
   elements["extraction-badge"].dataset.quality = conversation.scanComplete ? "complete" : "partial";
-  const quality = conversation.extractionMethod === "api"
-    ? "完整数据"
-    : conversation.scanComplete ? "已扫描页面" : "页面数据";
+  const quality = conversation.scanComplete ? "页面已解析" : "页面可能不完整";
   elements["extraction-badge"].textContent = quality;
   elements["filename-label"].textContent = state.filename;
   elements["filename-label"].title = state.filename;
@@ -180,6 +234,7 @@ function renderConversation(conversation) {
 }
 
 async function readCurrentConversation() {
+  setSaveStatus("disabled");
   setBusy(true);
   setView("loading");
   try {
@@ -240,17 +295,17 @@ function buildSaveUri() {
 }
 
 async function saveToObsidian() {
-  if (!state.conversation || state.busy) return;
+  if (!state.conversation || state.busy || state.saveStatus === "loading") return;
+  setSaveStatus("loading");
   setBusy(true);
-  state.sent = false;
-  renderSaveState();
+  let succeeded = false;
   try {
     const uri = buildSaveUri();
     assertCompleteMarkdownExport(state.conversation, state.markdown);
     if (isDemo) {
-      state.sent = true;
-      renderSaveState();
-      showToast("已发送到 Obsidian");
+      await new Promise((resolve) => setTimeout(resolve, 420));
+      succeeded = true;
+      setSaveStatus("success", "对话已保存到 Obsidian。");
       return;
     }
     await sendCompleteMarkdownToObsidian({
@@ -261,20 +316,24 @@ async function saveToObsidian() {
       tabId: state.sourceTabId,
       uri,
     });
-    state.sent = true;
-    renderSaveState();
-    showToast("已发送到 Obsidian");
+    succeeded = true;
+    setSaveStatus("success", "对话已保存到 Obsidian。");
   } catch (error) {
-    showToast(readableError(error), "error");
+    setSaveStatus("error", readableError(error));
   } finally {
     setBusy(false);
-    renderSaveState();
+    if (succeeded) {
+      state.saveResetTimer = setTimeout(() => {
+        if (state.saveStatus === "success") setSaveStatus("idle");
+      }, 1500);
+    }
   }
 }
 
 async function copyMarkdown() {
   try {
     await writeCompleteMarkdownToClipboard(navigator.clipboard, state.conversation, state.markdown);
+    showCopyFeedback();
     showToast("Markdown 已复制");
   } catch (error) {
     showToast(readableError(error), "error");
@@ -308,6 +367,7 @@ async function downloadMarkdown() {
 }
 
 function openSettings() {
+  elements["settings-error-message"].textContent = "";
   elements["vault-input"].value = state.settings.vault;
   elements["folder-input"].value = state.settings.folder;
   elements["silent-open-input"].checked = state.settings.silentOpen;
@@ -322,6 +382,7 @@ function closeSettings() {
 
 async function applySettings(event) {
   event.preventDefault();
+  elements["settings-error-message"].textContent = "";
   const nextSettings = normalizeSettings({
     vault: elements["vault-input"].value,
     folder: elements["folder-input"].value,
@@ -330,22 +391,23 @@ async function applySettings(event) {
   });
   try {
     state.settings = isDemo ? nextSettings : await saveSettings(webExtensionApi, nextSettings);
-    state.sent = false;
+    setSaveStatus(state.conversation ? "idle" : "disabled");
     renderDestination();
     updateMarkdown();
     renderSaveState();
     closeSettings();
     showToast("保存设置已更新");
   } catch (error) {
-    showToast(readableError(error), "error");
+    elements["settings-error-message"].textContent = readableError(error);
   }
 }
 
 async function configure() {
   state.browserKind = demoBrowser || await detectBrowserKind();
   document.body.dataset.browser = state.browserKind;
-  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-  elements["save-shortcut"].textContent = isMac ? "⌘ ↵" : "Ctrl ↵";
+  const platform = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent;
+  state.isMac = /Mac|iPhone|iPad/.test(platform);
+  elements["save-shortcut"].textContent = state.isMac ? "⌘ ↵" : "Ctrl ↵";
   if (isDemo) {
     state.settings = normalizeSettings({
       vault: query.get("vault") || "",
@@ -371,16 +433,22 @@ elements["close-settings-button"].addEventListener("click", closeSettings);
 elements["cancel-settings-button"].addEventListener("click", closeSettings);
 elements["settings-form"].addEventListener("submit", applySettings);
 elements["save-button"].addEventListener("click", saveToObsidian);
-elements["copy-button"].addEventListener("click", copyMarkdown);
-elements["download-button"].addEventListener("click", downloadMarkdown);
-[elements["copy-button"], elements["download-button"]].forEach((button) => {
-  button.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-  });
+elements["copy-button"].addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  copyMarkdown();
+});
+elements["download-button"].addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  downloadMarkdown();
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey)) return;
+  const target = event.target;
+  const isEditing = target instanceof HTMLElement
+    && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+  const hasSaveModifier = state.isMac ? event.metaKey : event.ctrlKey;
+  if (event.key !== "Enter" || !hasSaveModifier || isEditing || elements["settings-dialog"].open) return;
   event.preventDefault();
   saveToObsidian();
 });

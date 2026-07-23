@@ -112,6 +112,12 @@ try {
           settingsButtonVisible: Boolean(document.querySelector('#settings-button')),
           previewOpen: document.querySelector('#preview-section')?.open,
           saveText: document.querySelector('#save-button')?.textContent.trim() || '',
+          saveShortcut: document.querySelector('#save-shortcut')?.textContent.trim() || '',
+          saveButtonHeight: document.querySelector('#save-button')?.getBoundingClientRect().height || 0,
+          saveButtonVisible: (() => {
+            const rect = document.querySelector('#save-button')?.getBoundingClientRect();
+            return Boolean(rect && rect.top >= 0 && rect.bottom <= innerHeight);
+          })(),
           markdownLength: markdown.length,
           markdownLines: markdown.split('\\n').length,
           providerProperty: markdown.match(/^provider: "([^"]+)"$/m)?.[1] || '',
@@ -193,13 +199,16 @@ const passed = ["chatgpt", "gemini"].every((provider) => {
     && state.version === "0.5.0"
     && state.browserKind === "firefox"
     && state.brand === "AI Chat to Obsidian"
-    && state.messageMeta === "8 条消息 · 4 轮对话"
-    && state.extractionBadge.startsWith(provider === "gemini" ? "Gemini ·" : "ChatGPT ·")
+    && state.messageMeta === `8 条消息 · 4 轮对话 · ${provider === "gemini" ? "Gemini" : "ChatGPT"}`
+    && state.extractionBadge === "页面已解析"
     && state.destinationLabel === "保存到"
-    && state.destinationName === "当前 Vault / AI Chats"
+    && state.destinationName === "当前仓库 / AI Chats"
     && state.settingsButtonVisible === true
     && state.previewOpen === false
-    && state.saveText === "保存到 Obsidian"
+    && state.saveText.startsWith("保存到 Obsidian")
+    && /^(⌘ ↵|Ctrl ↵)$/.test(state.saveShortcut)
+    && state.saveButtonHeight === 54
+    && state.saveButtonVisible === true
     && state.markdownLength > 700
     && state.markdownLines >= 60
     && state.providerProperty === provider
@@ -208,7 +217,7 @@ const passed = ["chatgpt", "gemini"].every((provider) => {
     && state.assistantSections === 4
     && state.markdownBytes > 1200
     && state.markdownSections === 8
-    && state.popupHeight < 430
+    && state.popupHeight <= 500
     && state.horizontalOverflow === false
     && state.backgroundResponse?.ok === false
     && /No Markdown content/.test(state.backgroundResponse?.error || "");
