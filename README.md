@@ -1,10 +1,10 @@
 # AI Chat to Obsidian
 
-一个将 ChatGPT 和 Gemini 网页对话完整保存为 Obsidian Markdown 的 Chrome、Edge、Firefox 扩展。扩展在本地读取当前对话、校验正文，再通过剪贴板和 `obsidian://new` 写入 Vault；对话不会上传到第三方服务。
+一个将 ChatGPT 和 Gemini 网页对话完整保存为 Obsidian Markdown 的 Chrome、Edge、Firefox 扩展。扩展在本地读取当前对话、预览属性与正文、校验完整性，再通过剪贴板和 `obsidian://new` 写入 Obsidian 仓库（Vault）；对话不会上传到第三方服务。
 
-| 浅色界面 | 深色界面 | 保存设置 |
+| 默认预览 | 详细属性 | 仓库与目录 |
 | --- | --- | --- |
-| ![浅色弹窗](docs/popup-preview.png) | ![深色弹窗](docs/firefox-popup-preview.png) | ![保存设置](docs/destination-preview.png) |
+| ![默认 Markdown 与属性预览](docs/popup-preview.png) | ![Gemini 详细属性预览](docs/firefox-popup-preview.png) | ![Obsidian 仓库与目录设置](docs/destination-preview.png) |
 
 ## 功能
 
@@ -13,10 +13,13 @@
 - 扫描窗口化长列表，并在读取后恢复原滚动位置
 - 保留标题、段落、列表、引用、代码块、表格、链接和 LaTeX 公式
 - 保存前校验 Markdown 消息段数和 UTF-8 大小，阻止只剩标题的空笔记
-- 支持指定 Vault、相对文件夹、后台保存和详细属性
+- 在弹窗中分别预览 Obsidian 属性和 Markdown 正文
+- 支持指定 Obsidian 仓库、相对文件夹、后台保存和详细属性
+- 后台保存与详细属性可直接在主界面切换，仓库和目录在独立对话框中编辑
 - 提供复制 Markdown 和下载 `.md` 两种备用方式
+- 支持 `Command/Ctrl + Enter` 快速保存，并显示保存中、成功和失败状态
 - Chromium 和 Firefox 使用同一套导出、校验与保存逻辑
-- 跟随系统浅色或深色外观
+- 使用固定深色界面，弹窗尺寸为 `400 × 600`
 
 ## 安装
 
@@ -47,18 +50,28 @@ Firefox 的临时扩展会在浏览器重启后移除，适合本地开发；长
 
 1. 打开一条 ChatGPT 或 Gemini 对话，等待当前回答生成完成。
 2. 点击浏览器工具栏中的扩展图标。
-3. 核对平台、消息数量、轮数和读取状态。
-4. 点击“保存到 Obsidian”。
-5. 浏览器首次使用时如询问是否允许打开 Obsidian，选择允许。
+3. 核对平台、消息数量、轮数、读取状态以及属性预览。
+4. 按需展开“Markdown 正文”，或调整“后台保存”和“详细属性”。
+5. 点击“保存到 Obsidian”，也可以按 `Command/Ctrl + Enter`。
+6. 浏览器首次使用时如询问是否允许打开 Obsidian，选择允许。
 
-新安装默认保存到当前或最近打开的 Vault 下的 `AI Chats/`。从旧版本升级时会保留已经设置的 `ChatGPT/` 或其他目录，不会自动迁移。右上角设置按钮和保存位置整行都可打开设置：
+新安装默认保存到当前或最近打开的 Obsidian 仓库下的 `AI Chats/`。从旧版本升级时会保留已经设置的 `ChatGPT/` 或其他目录，不会自动迁移。主界面的两个开关会立即保存；右上角设置按钮和保存位置整行都可打开“仓库与目录”对话框：
 
-- **Vault 名称**：留空时使用 Obsidian 当前或最近打开的 Vault。
-- **文件夹**：Vault 内的相对路径。
+- **仓库名称**：留空时使用 Obsidian 当前或最近打开的仓库。
+- **文件夹**：仓库内的相对路径。
 - **后台保存**：创建或更新文件，但不在 Obsidian 中打开新笔记。
 - **详细属性**：额外写入时间、消息数、轮数和提取方式。
 
 同一条对话使用稳定文件名并发送 `overwrite=true`，重复保存会更新原笔记。
+
+## 弹窗预览
+
+“Markdown 预览”默认展开，并把待写入内容分成两部分：
+
+- **属性**：默认显示 `title`、`source`、`conversation_id` 和平台标签；开启“详细属性”后会立即扩展为完整属性列表。
+- **Markdown 正文**：显示标题和 User/Assistant 消息正文，不重复展示 YAML frontmatter，可独立展开或收起。
+
+预览标题同时显示正文段落数和 UTF-8 大小。复制与下载按钮始终使用经过完整性校验的完整 Markdown，包括属性、标题和正文。
 
 ## 保存原理
 
@@ -68,7 +81,7 @@ Firefox 的临时扩展会在浏览器重启后移除，适合本地开发；长
 obsidian://new?file=AI%20Chats%2FConversation.md&overwrite=true&silent=true&clipboard
 ```
 
-长对话正文不会放进 URL，因此不受 URI 长度限制。Obsidian 从本地剪贴板读取正文，并在 Vault 中创建或覆盖文件。如果自定义协议不可用，仍可使用弹窗右下角的复制或下载按钮。
+长对话正文不会放进 URL，因此不受 URI 长度限制。Obsidian 从本地剪贴板读取正文，并在仓库中创建或覆盖文件。如果自定义协议不可用，仍可使用 Markdown 预览标题栏中的复制或下载按钮。
 
 发送前会核对生成文档中的 `## User`、`## Assistant` 段落数量与读取到的消息数量。正文为空、段落缺失或发生截断时，扩展会停止保存并提示重新读取。
 
@@ -98,16 +111,14 @@ rounds: 4
 extraction: "api"
 ```
 
-这些内容是 Obsidian 的 YAML 笔记属性，不是正文标签。默认关闭“详细属性”，因此不会显示平台、时间、消息数等扩展字段；`source`、`conversation_id` 和平台标签用于追溯与识别同一条对话。
+这些内容是 Obsidian 的 YAML 笔记属性，不是正文标签。默认关闭“详细属性”，因此不会写入平台、时间、消息数等扩展字段；`source`、`conversation_id` 和平台标签用于追溯与识别同一条对话。弹窗属性列表和最终 YAML 由同一份结构化数据生成，避免预览与实际文件不一致。
 
 ## 读取状态
 
-- **ChatGPT · 完整数据**：读取当前对话的结构化消息树，只导出当前选中的回答分支。
-- **ChatGPT · 已扫描页面**：结构化数据不可用，已扫描页面中的消息列表。
-- **Gemini · 已扫描页面**：已从 Gemini 页面扫描到对话列表两端并完成去重。
-- **页面数据**：扫描未能确认到达两端，保存前应核对消息数量。
+- **页面已解析**：已取得可导出的消息，并确认页面扫描完整。
+- **页面可能不完整**：未能确认到达对话列表两端，保存前应核对消息数量和预览正文。
 
-Gemini 网页没有使用本扩展可依赖的公开导出接口，因此适配器读取语义化页面元素，并专门处理其长对话滚动容器。页面结构变化后可能需要更新选择器。
+平台名称显示在消息数和轮数旁。ChatGPT 优先读取当前对话的结构化消息树，只导出当前选中的回答分支；结构化数据不可用时改为扫描页面。Gemini 没有本扩展可依赖的公开导出接口，因此适配器读取语义化页面元素，并专门处理长对话滚动容器。网页结构变化后可能需要更新选择器。
 
 ## 隐私与权限
 
@@ -146,11 +157,11 @@ npm run build
 npm run smoke:gemini
 ```
 
-自动化测试覆盖平台路由、恶意相似域名拒绝、ChatGPT 消息树、Gemini DOM 归一化、Markdown 标签、正文完整性、剪贴板逐字节传输、Obsidian URI、下载与设置持久化。
+自动化测试覆盖平台路由、恶意相似域名拒绝、ChatGPT 消息树、Gemini DOM 归一化、结构化属性与 YAML 一致性、正文完整性、剪贴板逐字节传输、Obsidian URI、下载与设置持久化。
 
 `npm run smoke:gemini` 会自行启动临时本地服务器与无头 Firefox，验证 Gemini 的普通代码块、CodeMirror、表格、公式、来源和危险链接清理。
 
-Firefox 真实扩展冒烟测试使用 WebDriver BiDi，同时验证 ChatGPT 和 Gemini demo：
+Firefox 真实扩展冒烟测试使用 WebDriver BiDi，同时验证 ChatGPT 和 Gemini demo、`400 × 600` 布局、属性预览、折叠交互、内联设置、复制下载以及保存状态：
 
 ```bash
 /Applications/Firefox.app/Contents/MacOS/firefox \
@@ -182,11 +193,11 @@ python3 -m http.server 4173 --bind 127.0.0.1
 ```text
 manifest.json / manifest.firefox.json   Chromium / Firefox Manifest
 background.js                           下载与 Obsidian URI 安全跳转
-popup.html / popup.js / styles.css      弹窗界面与保存流程
+popup.html / popup.js / styles.css      属性与正文预览、设置和保存流程
 src/providers.js                        平台元数据与严格 URL 路由
 src/extract-page.js                     ChatGPT API 与 DOM 提取器
 src/extract-gemini.js                   Gemini DOM 与长对话扫描器
-src/conversation.js                     统一会话模型和 Markdown 生成
+src/conversation.js                     统一会话模型、结构化属性和 Markdown 生成
 src/html-to-markdown.js                 富文本到 Obsidian Markdown 转换
 src/export-payload.js                   正文完整性检查与大小统计
 src/obsidian.js                         Obsidian URI 构造与校验
